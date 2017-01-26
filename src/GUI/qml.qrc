@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>QueryListItemDelegate.qml</file>
+        <file>CommandListItemDelegate.qml</file>
+        <file>open_file.png</file>
+    </qresource>
+</RCC>

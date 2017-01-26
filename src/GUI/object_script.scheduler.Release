@@ -1,0 +1,12 @@
+INPUT(
+./release\main.o
+./release\BuildScanPair.o
+./release\CommandProcessor.o
+./release\Scheduler.o
+./release\Timeline.o
+./release\Utility.o
+./release\qrc_qml.o
+./release\moc_QueryRecords.o
+./release\moc_CommandRecords.o
+./release\moc_QMLSchedulerController.o
+);

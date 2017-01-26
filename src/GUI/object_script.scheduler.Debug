@@ -1,0 +1,12 @@
+INPUT(
+./debug\main.o
+./debug\BuildScanPair.o
+./debug\CommandProcessor.o
+./debug\Scheduler.o
+./debug\Timeline.o
+./debug\Utility.o
+./debug\qrc_qml.o
+./debug\moc_QueryRecords.o
+./debug\moc_CommandRecords.o
+./debug\moc_QMLSchedulerController.o
+);

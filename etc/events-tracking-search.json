@@ -1,0 +1,16 @@
+{
+  "description" : ["Файл задающий последовательность событий моделирования. trigger_time - время активации события в нс", 
+                   "event_type - тип события (seearch - поиск, - запрос технического состояния, confirm - подтверждение ",
+                   "обнаружения, drop - сброс заявки), id - идентификатор, rcs - ЭПР в кв.м, range - дальность в м."],
+  "Events": [
+        { "trigger_time" : "0" , "event_type" : "search", "id" : 3000, "rcs" : 15.0, "range" : 2100000 },
+        { "trigger_time" : "0" , "event_type" : "search", "id" : 1000, "rcs" : 50.0, "range" : 1000000 },
+        { "trigger_time" : "0" , "event_type" : "search", "id" : 2000, "rcs" : 50.0, "range" : 2100000 },
+
+        { "trigger_time" : "100000000" , "event_type" : "confirm", "id" : 1001, "rcs" : 50.0, "range" : 1000000 },
+        { "trigger_time" : "100000000" , "event_type" : "confirm", "id" : 2001, "rcs" : 50.0, "range" : 1100000 },
+        { "trigger_time" : "100000000" , "event_type" : "confirm", "id" : 3001, "rcs" : 50.0, "range" : 2100000 },
+        { "trigger_time" : "100000000" , "event_type" : "confirm", "id" : 4001, "rcs" : 15.0, "range" : 2100000 },
+        { "trigger_time" : "100000000" , "event_type" : "confirm", "id" : 5001, "rcs" : 15.0, "range" : 2100000 }
+    ]
+}

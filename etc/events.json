@@ -1,0 +1,26 @@
+{
+  "description" : ["Файл задающий последовательность событий моделирования. trigger_time - время активации события в нс", 
+                   "event_type - тип события (seearch - поиск, - запрос технического состояния, confirm - подтверждение ",
+                   "обнаружения, drop - сброс заявки), id - идентификатор, rcs - ЭПР в кв.м, range - дальность в м."],
+  "Events": [
+        { "trigger_time" : "0" , "event_type" : "search", "id" : 1000, "rcs" : 15.0, "range" : 2000000 },
+        { "trigger_time" : "0" , "event_type" : "search", "id" : 2000, "rcs" : 50.0, "range" : 1000000 },
+        { "trigger_time" : "0" , "event_type" : "search", "id" : 3000, "rcs" : 50.0, "range" : 2100000 },
+
+        { "trigger_time" : "0" , "event_type" : "tech", "id" : 100},
+
+        { "trigger_time" : "10000000" , "event_type" : "confirm", "id" : 1001, "rcs" : 15.0, "range" : 2000000 },
+
+        { "trigger_time" : "100000000" , "event_type" : "confirm", "id" : 2001, "rcs" : 50.0, "range" : 1000000 },
+        { "trigger_time" : "100000000" , "event_type" : "confirm", "id" : 3001, "rcs" : 50.0, "range" : 1000000 },
+        { "trigger_time" : "100000000" , "event_type" : "confirm", "id" : 4001, "rcs" : 50.0, "range" : 2100000 },
+
+        { "trigger_time" : "1000000000" , "event_type" : "drop", "id" : 1003 },
+        { "trigger_time" : "1000000000" , "event_type" : "drop", "id" : 2003 },
+        { "trigger_time" : "1000000000" , "event_type" : "drop", "id" : 3003 },
+        { "trigger_time" : "1000000000" , "event_type" : "drop", "id" : 4003 },
+        { "trigger_time" : "1000000000" , "event_type" : "drop", "id" : 1000 },
+        { "trigger_time" : "1000000000" , "event_type" : "drop", "id" : 2000 },
+        { "trigger_time" : "1000000000" , "event_type" : "drop", "id" : 3000 }
+    ]
+}
