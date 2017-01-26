@@ -70,9 +70,6 @@ namespace settings
   // Глубина конвейера, в дискретах (1 сек)
   static const std::uint32_t timeline_depth = 100000;
 
-  // Глубина планирования одиночного импульса, в интервалах планирования
-  static const std::uint32_t pulse_planning_depth = 3;
-
-  // Глубина планирования пачки, в интервалах планирования
-  static const std::uint32_t pulse_train_planning_depth = 35;
+  // Глубина планирования
+  static const std::uint32_t planning_depth = 10;
 }

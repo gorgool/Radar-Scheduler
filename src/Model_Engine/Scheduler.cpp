@@ -99,26 +99,26 @@ std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, co
   // Одиночный импульс
   if (scan_pair.size == 1)
   {
-    depth = settings::pulse_planning_depth * settings::planning_step;
-
     transmit_len = multiples_of(static_cast<std::uint32_t>(scan_pair.transmit[0].length) * settings::duty_factor
       + 2 * settings::frequency_delay
       + settings::blank_delay
       + settings::reserve_time, settings::frequency_factor);
 
     receive_len = multiples_of(static_cast<std::uint32_t>(scan_pair.receive[0].length + settings::reserve_time), settings::frequency_factor);
+
+    depth = settings::planning_depth * settings::planning_step + transmit_len / settings::time_chunk_length;
   }
   // Пачка
   else
   {
-    depth = settings::pulse_train_planning_depth * settings::planning_step;
-    
     period_time = static_cast<std::uint32_t>(scan_pair.transmit[1].offset_time);
     
     transmit_len = multiples_of(period_time * scan_pair.size + settings::blank_delay 
       + 2 * settings::frequency_delay + settings::reserve_time, settings::frequency_factor);
     
     receive_len = multiples_of(period_time * scan_pair.size + settings::reserve_time, settings::frequency_factor);
+
+    depth = settings::planning_depth * settings::planning_step + transmit_len / settings::time_chunk_length;
   }
 
   // Поиск подходящего места для временной связки на КВД

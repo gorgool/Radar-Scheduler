@@ -39,15 +39,24 @@ void Timeline::label_sector(const std::uint32_t start_idx, const std::uint32_t s
 
 std::int32_t Timeline::get_idx_for(const std::uint32_t time)
 {
-  if (time > settings::timeline_depth * settings::time_chunk_length)
+  // По факту работаем со смещенным времем для устранения возможности
+  // наложения дискретов на их границах, если время кратно длительности дискрета
+  auto shifted_time = time;
+
+  if (time > 0)
+  {
+      shifted_time--;
+  }
+
+  if (shifted_time > settings::timeline_depth * settings::time_chunk_length)
   {
     throw ModelException("ERROR: Time is out of range in get_idx_for.");
   }
 
-  auto ret = time / settings::time_chunk_length;
+  auto ret = shifted_time / settings::time_chunk_length;
 
   // Проверка попадания на границу дискрета
-  if (time % settings::time_chunk_length == 0)
+  if (shifted_time % settings::time_chunk_length == 0)
     // Если попали, то считает как следующий дискрет
     return ret + 1;
   else
