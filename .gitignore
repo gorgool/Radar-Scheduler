@@ -1,0 +1,11 @@
+debug
+release
+*.o
+Makefile*
+.Debug
+.Release
+.user
+log.txt
+deployment
+*.bat
+.qmake.stash
