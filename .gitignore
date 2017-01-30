@@ -9,3 +9,8 @@ log.txt
 deployment
 *.bat
 .qmake.stash
+build-*
+*.pro.user*
+moc_*
+*~
+qrc_qml.cpp

@@ -91,7 +91,7 @@ void Timeline::move_timeline(std::uint64_t time)
 double Timeline::occupation()
 {
   std::uint32_t empty_counter = 0;
-  auto occupation_size = settings::pulse_planning_depth * settings::planning_step;
+  auto occupation_size = settings::planning_step;
   for (std::size_t idx = 0; idx < occupation_size; ++idx)
   {
     if (get_value_at(idx) == TimelineLabel::tll_empty)

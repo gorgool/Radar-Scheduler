@@ -118,6 +118,8 @@ public:
 
     virtual QImage requestImage(const QString &id, QSize *size, const QSize& requestedSize)
     {
+        Q_UNUSED(requestedSize);
+
         int width = tile_width;
         int height = tile_height;
 

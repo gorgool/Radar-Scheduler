@@ -49,17 +49,17 @@ class QMLSchedulerController : public QObject
 
     // ====== Графики КВД ======
     // УЦП до размещения команд
-    TimelineGraph dcu_before;
+    TimelineGraph* dcu_before;
     // УЦП после размещения команд
-    TimelineGraph dcu_after;
+    TimelineGraph* dcu_after;
     // АУ передатчика до размещения команд
-    TimelineGraph au_tr_before;
+    TimelineGraph* au_tr_before;
     // АУ передатчика после размещения команд
-    TimelineGraph au_tr_after;
+    TimelineGraph* au_tr_after;
     // АУ приемника до размещения команд
-    TimelineGraph au_rs_before;
+    TimelineGraph* au_rs_before;
     // АУ приемника после размещения команд
-    TimelineGraph au_rs_after;
+    TimelineGraph* au_rs_after;
 
     // ====== Контекст QML ======
     QQmlContext *ctxt;
@@ -84,13 +84,19 @@ public:
         ctxt->setContextProperty("au_rs_before_occupation", QVariant(0));
         ctxt->setContextProperty("au_rs_after_occupation", QVariant(0));
 
-
-        ctxt->engine()->addImageProvider("dcu_before", &dcu_before);
-        ctxt->engine()->addImageProvider("dcu_after", &dcu_after);
-        ctxt->engine()->addImageProvider("au_tr_before", &au_tr_before);
-        ctxt->engine()->addImageProvider("au_tr_after", &au_tr_after);
-        ctxt->engine()->addImageProvider("au_rs_before", &au_rs_before);
-        ctxt->engine()->addImageProvider("au_rs_after", &au_rs_after);
+        // Do not delete TimelineGraphs in destructor due to double free error.
+        dcu_before = new TimelineGraph();
+        ctxt->engine()->addImageProvider("dcu_before", dcu_before);
+        dcu_after = new TimelineGraph();
+        ctxt->engine()->addImageProvider("dcu_after", dcu_after);
+        au_tr_before = new TimelineGraph();
+        ctxt->engine()->addImageProvider("au_tr_before", au_tr_before);
+        au_tr_after = new TimelineGraph();
+        ctxt->engine()->addImageProvider("au_tr_after", au_tr_after);
+        au_rs_before = new TimelineGraph();
+        ctxt->engine()->addImageProvider("au_rs_before", au_rs_before);
+        au_rs_after = new TimelineGraph();
+        ctxt->engine()->addImageProvider("au_rs_after", au_rs_after);
     }
 
     Q_INVOKABLE void run_engine(const quint32 times)
@@ -120,12 +126,12 @@ public:
                 emit disableButtons();
             }
 
-            dcu_before.draw_image(state.dcu_timeline_before);
-            dcu_after.draw_image(state.dcu_timeline_after);
-            au_tr_before.draw_image(state.au_tr_timeline_before);
-            au_tr_after.draw_image(state.au_tr_timeline_after);
-            au_rs_before.draw_image(state.au_rs_timeline_before);
-            au_rs_after.draw_image(state.au_rs_timeline_after);
+            dcu_before->draw_image(state.dcu_timeline_before);
+            dcu_after->draw_image(state.dcu_timeline_after);
+            au_tr_before->draw_image(state.au_tr_timeline_before);
+            au_tr_after->draw_image(state.au_tr_timeline_after);
+            au_rs_before->draw_image(state.au_rs_timeline_before);
+            au_rs_after->draw_image(state.au_rs_timeline_after);
 
             emit imageReady();
 
@@ -143,8 +149,9 @@ public:
 
     Q_INVOKABLE bool load_queries(const QString filepath)
     {
+        QUrl local_file(filepath);
         // Спарсить файл событий
-        QFile event_file(filepath.mid(8));
+        QFile event_file(local_file.toLocalFile());
 
         if (!event_file.open(QIODevice::ReadOnly))
         {

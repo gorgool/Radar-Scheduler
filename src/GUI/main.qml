@@ -20,7 +20,7 @@ C14.ApplicationWindow
     {
         id: custom_font
         property font main_text: Qt.font({
-                                             family: "Segoi",
+                                             family: "Ubuntu Light",
                                              pixelSize: 14
                                          })
     }
@@ -80,8 +80,7 @@ C14.ApplicationWindow
                     anchors.topMargin: 4
                     anchors.horizontalCenter: queryColumn.horizontalCenter
                     id: queryPanelTitle
-                    font.family: "Segoi"
-                    font.pixelSize: 16
+                    font: custom_font.main_text
                     text: "Завяки на обслуживание"
                 }
 
@@ -106,8 +105,7 @@ C14.ApplicationWindow
                             Text
                             {
                                 id: activeQueryTitle
-                                font.family: "Segoi"
-                                font.pixelSize: 12
+                                font: custom_font.main_text
                                 text: "Очередь активных заявок"
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
@@ -155,8 +153,7 @@ C14.ApplicationWindow
                                         Text
                                         {
                                             id: idText
-                                            font.family: "Segoi"
-                                            font.pixelSize: 14
+                                            font: custom_font.main_text
                                             text: "Id : " + query_id
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
@@ -190,8 +187,7 @@ C14.ApplicationWindow
                             Text
                             {
                                 id: execQueryTitle
-                                font.family: "Segoi"
-                                font.pixelSize: 12
+                                font: custom_font.main_text
                                 text: "Очередь исполненных заявок"
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
@@ -240,8 +236,7 @@ C14.ApplicationWindow
                                         Text
                                         {
                                             id: idText
-                                            font.family: "Segoi"
-                                            font.pixelSize: 14
+                                            font: custom_font.main_text
                                             text: "Id : " + query_id
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
@@ -268,8 +263,7 @@ C14.ApplicationWindow
                         Text
                         {
                             id: showParamsTitle
-                            font.family: "Segoi"
-                            font.pixelSize: 12
+                            font: custom_font.main_text
                             text: "Параметры выбранной заявки"
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
@@ -346,8 +340,7 @@ C14.ApplicationWindow
                     anchors.topMargin: 4
                     anchors.horizontalCenter: commandColumn.horizontalCenter
                     id: commandPanelTitle
-                    font.family: "Segoi"
-                    font.pixelSize: 16
+                    font: custom_font.main_text
                     text: "Команды управления"
                 }
 
@@ -373,8 +366,7 @@ C14.ApplicationWindow
                             Text
                             {
                                 id: plannedCommandTitle
-                                font.family: "Segoi"
-                                font.pixelSize: 12
+                                font: custom_font.main_text
                                 text: "Очередь запланированных команд"
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
@@ -418,8 +410,7 @@ C14.ApplicationWindow
                                         Text
                                         {
                                             id: idText
-                                            font.family: "Segoi"
-                                            font.pixelSize: 14
+                                            font: custom_font.main_text
                                             text: "Id : " + command_query_id
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
@@ -453,8 +444,7 @@ C14.ApplicationWindow
                             Text
                             {
                                 id: execCommandTitle
-                                font.family: "Segoi"
-                                font.pixelSize: 12
+                                font: custom_font.main_text
                                 text: "Очередь исполненных команд"
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
@@ -498,8 +488,7 @@ C14.ApplicationWindow
                                         Text
                                         {
                                             id: idText
-                                            font.family: "Segoi"
-                                            font.pixelSize: 14
+                                            font: custom_font.main_text
                                             text: "Id : " + command_query_id
                                             horizontalAlignment: Text.AlignHCenter
                                             verticalAlignment: Text.AlignVCenter
@@ -527,8 +516,7 @@ C14.ApplicationWindow
                         Text
                         {
                             id: showCommandTitle
-                            font.family: "Segoi"
-                            font.pixelSize: 12
+                            font: custom_font.main_text
                             text: "Параметры выбранной команды"
                             anchors.horizontalCenter: parent.horizontalCenter
                         }
@@ -580,8 +568,7 @@ C14.ApplicationWindow
                 anchors.topMargin: 4
                 anchors.horizontalCenter: controlPanel.horizontalCenter
                 id: controlPanelTitle
-                font.family: "Segoi"
-                font.pixelSize: 16
+                font: custom_font.main_text
                 text: "Управление исполнением"
             }
 
@@ -624,8 +611,7 @@ C14.ApplicationWindow
                 anchors.left: controlPanel.left
                 anchors.leftMargin: 60
                 anchors.topMargin: 8
-                font.family: "Segoi"
-                font.pixelSize: 14
+                font: custom_font.main_text
                 text: "Вперед"
 
                 background: Rectangle
@@ -650,8 +636,7 @@ C14.ApplicationWindow
                 anchors.topMargin: 8
                 anchors.left: nextBotton.right
                 anchors.leftMargin: 32
-                font.family: "Segoi"
-                font.pixelSize: 14
+                font: custom_font.main_text
                 text: "Вперед на ..."
 
                 background: Rectangle
@@ -694,8 +679,7 @@ C14.ApplicationWindow
                 {
                     id: stepCount
                     anchors.fill: parent
-                    font.family: "Segoi"
-                    font.pixelSize: 14
+                    font: custom_font.main_text
                     text: "100"
                     leftPadding: 12
                     padding: 6
@@ -710,8 +694,7 @@ C14.ApplicationWindow
                 anchors.topMargin: 8 + 4
                 anchors.left: stepCountInput.right
                 anchors.leftMargin: 32
-                font.family: "Segoi"
-                font.pixelSize: 14
+                font: custom_font.main_text
             }
 
             Text
@@ -722,8 +705,7 @@ C14.ApplicationWindow
                 anchors.topMargin: 8 + 4
                 anchors.left: stepCountInput.right
                 anchors.leftMargin: 270
-                font.family: "Segoi"
-                font.pixelSize: 14
+                font: custom_font.main_text
             }
 
             // Валидация
