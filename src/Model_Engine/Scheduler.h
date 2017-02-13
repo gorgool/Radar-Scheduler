@@ -8,27 +8,32 @@
 #include "ModelState.h"
 #include "BuildScanPair.h"
 
+/*
+  Scheduler class.
+  Parameters of timelines and scheduler are specified in Setting.h
+*/
+
 class Scheduler
 {
-  // Конвейер временных дискретов УЦП (Digital Converter Unit)
+  // DCU (Digital Converter Unit) Timeline
   Timeline dcu_timeline;
 
-  // Конвейер временных дискретов АУ приемного устройства (Antenna Unit)
+  // Transmitter AU (Antenna Unit) Timeline
   Timeline tr_au_timeline;
 
-  // Конвейер временных дискретов АУ передающего устройства
-  Timeline rs_au_timeline;
+  // Receiver AU (Antenna Unit) Timeline
+  Timeline rs_au_timeline;  
 
-  // Найти индекс на КВД, подходящий для размещения участка transmit_len (нс) и соответствующего ему receive_len (нс) 
-  // со смещением range_offset(нс), на глубину планирования depth.
-  // Возвращает -1 в случае если такого индекса не существует и положительное целое, равное индексу, в случае успеха.
+  // Return index for DCU Timeline which allow to allocate region equal to transmit_len (ns) 
+  // and coupled to it another region equal to receive_len (ns) with offset range_offset (ns).
+  // Returns -1 if there is not such index or positive integer in case of success.
   std::int32_t find_index(const std::uint32_t transmit_len, const std::uint32_t receive_len, const std::uint32_t range_offset, const std::uint32_t depth);
 
-  // Разместить временную связку scan_pair на КВД УЦП dcu_timeline и КВД АУ au_timeline в интересах обслуживания заявки query_id.
-  // В случае успеха возвращает список команд управления УЦП и АУ. В случае неудачи возвращает комманды типа nop (no operation).
+  // Allocate scan_pair in DCU and AU (both) Timelines for execution query_id.
+  // If succeeded return commands list, otherwise empty list of "nop"" commands.
   std::vector<ControlCommand> place_scan(const ScanPair& scan_pair, const std::uint32_t query_id);
 
-  // Удаление заявки с идентификатором query_id
+  // Remove query whose id equal to query_id.
   void remove_query(const std::uint32_t query_id);
 
 public:
@@ -36,21 +41,21 @@ public:
 
   using QueryListType = std::vector<std::shared_ptr<Query>>;
 
-  // Массив заявок
+  // Active query list
   QueryListType queries;
 
-  // Массив исполненных в последнем запуске ф-ии run заявок
+  // The last executed queries (during run function call).
   QueryListType processed_queries;
 
-  // Выполнение одного такта планирования на момент времени time
+  // Execute one planning step for time moment equal time
   std::vector<ControlCommand> run(std::uint64_t time);
 
-  // Заполняет переданную структуру model_state параметрами активных и исполненных в последнем запуске ф-ии run заявок
+  // Fill model_state with active and executed queries parameters.
   void get_statistics(ModelState& model_state);
 
-  // Сохраняет состояние КВД по переданным ссылкам
+  // Save timelines state.
   void save_timilines(Timeline& _dcu_timeline, Timeline& _au_tr_timeline, Timeline& _au_rs_timeline);
 
-  // Очистить список заявок с сбросить КВД
+  // Clear all queries lists and reset timelines.
   void reset();
 };

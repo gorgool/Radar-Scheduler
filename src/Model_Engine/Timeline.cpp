@@ -1,6 +1,7 @@
 #include "Timeline.h"
 
-
+// Check if it is posible to allocate region of length starting from idx with given pred (predicate).
+// Return true in case of success. false otherwise.
 bool Timeline::check_index(const std::uint32_t length, const std::uint32_t idx, std::function<bool(const pipiline_type::value_type&)> pred)
 {
   assert(length < settings::timeline_depth);
@@ -8,13 +9,12 @@ bool Timeline::check_index(const std::uint32_t length, const std::uint32_t idx, 
 
   for (std::uint32_t offset = 0; offset < length; ++offset)
   {
-    // Выход за пределы КВД
+    // Out of timeline bound
     if (idx + offset >= settings::timeline_depth)
       return false;
 
     auto timeline_value = get_value_at(idx + offset);
 
-    // Проверка КВД на метки свободно (free) или время восстановления после излучения (energy_restore)
     if (pred(timeline_value))
       continue;
     else
@@ -24,6 +24,7 @@ bool Timeline::check_index(const std::uint32_t length, const std::uint32_t idx, 
   return true;
 }
 
+// Mark timeline region from start_idx to stop_idx with given label.
 void Timeline::label_sector(const std::uint32_t start_idx, const std::uint32_t stop_idx, const TimelineLabel label)
 {
   if (start_idx > stop_idx)
@@ -37,15 +38,17 @@ void Timeline::label_sector(const std::uint32_t start_idx, const std::uint32_t s
   }
 }
 
+// Return index for timeline chunk that corresponds to given relative time, g.e. time=0 return index=0.
+// Return -1 if there is not such index.
 std::int32_t Timeline::get_idx_for(const std::uint32_t time)
 {
-  // По факту работаем со смещенным времем для устранения возможности
-  // наложения дискретов на их границах, если время кратно длительности дискрета
   auto shifted_time = time;
 
   if (time > 0)
   {
-      shifted_time--;
+    // Move time a little for eliminating possibility to overlap chunks if time 
+    // is equal to a value multiple of timeline chunk length
+    shifted_time--;
   }
 
   if (shifted_time > settings::timeline_depth * settings::time_chunk_length)
@@ -55,15 +58,16 @@ std::int32_t Timeline::get_idx_for(const std::uint32_t time)
 
   auto ret = shifted_time / settings::time_chunk_length;
 
-  // Проверка попадания на границу дискрета
+  // If time at the border of chunks
   if (shifted_time % settings::time_chunk_length == 0)
-    // Если попали, то считает как следующий дискрет
+    // Return the next one
     return ret + 1;
   else
     return ret;
 
 }
 
+// Move timetile till given time. Update start_time and start_idx and prepare new region.
 void Timeline::move_timeline(std::uint64_t time)
 {
   if (time < start_time)
@@ -71,23 +75,17 @@ void Timeline::move_timeline(std::uint64_t time)
     throw ModelException("ERROR: can't move timeline backward.");
   }
 
-  // Смещение по времени
   std::uint32_t time_offset = static_cast<std::uint32_t>(time - start_time);
-
-  // Обновляем время привязки КВД, с учетов выравнивания по границе дискретов КВД
   start_time = multiples_of(time, static_cast<std::uint64_t>(settings::time_chunk_length));
 
-  //if (start_time > settings::time_chunk_length)
-  //  start_time -= settings::time_chunk_length;
-
-  // Очищаем крайний "левый" (ближайщий по времени) участок конвейера
+  // CLear the oldest region 
   for (std::size_t offset = 0; offset < time_offset / settings::time_chunk_length; ++offset)
     get_value_at(offset) = TimelineLabel::tll_empty;
 
-  // Смещаем индекс первого дискрета КВД
   start_idx = (start_idx + time_offset / settings::time_chunk_length) % settings::timeline_depth;
 }
 
+// Compute occupation coefficient.
 double Timeline::occupation()
 {
   std::uint32_t empty_counter = 0;
@@ -101,6 +99,7 @@ double Timeline::occupation()
   return 1.0 - static_cast<double>(empty_counter) / occupation_size;
 }
 
+// Reset all.
 void Timeline::reset()
 {
     timeline.fill(TimelineLabel::tll_empty);
@@ -108,6 +107,7 @@ void Timeline::reset()
     start_time = 0;
 }
 
+// Return refarance to timeline chunk by idx. Idx=0 correspond to most recent chunk.
 TimelineLabel& Timeline::get_value_at(const std::size_t idx)
 {
   return timeline[(start_idx + idx) % settings::timeline_depth];

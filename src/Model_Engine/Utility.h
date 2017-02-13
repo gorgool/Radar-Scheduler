@@ -5,9 +5,9 @@
 #include <cmath>
 
 /*
-¬спомогательна€ функци€ округлени€ времени до кратных величин в большую сторону.
-value - преобразуемое число
-number - фактор кратности
+  Utility function for round-up value to nearest value that is mulpiples of given number.
+  value - unput number
+  number - frequency factor
 */
 
 template<typename RetT>

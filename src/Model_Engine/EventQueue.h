@@ -8,20 +8,20 @@
 class Scheduler;
 
 /*
-  Событие моделирования планировщика.
-  trigger_time - время наступления события, нс
-  exec - функция обработчик события
+  Model event.
 */
 struct Event
 {
-  // Время наступления события, нс
+  // Activation time, ns.
   std::uint64_t trigger_time;
 
-  // Функция обработчик события.
-  // Входной параметр - ссылка на планировщи.
-  // Возвращает true в случае успешного выполнения, false иначе.
+  // event handler function.
+  // handler signature: 
+  //     input - class Scheduler referance.
+  //     return - true for success, false otherwise
   std::function<bool(Scheduler&)> exec;
 
+  // Constructor
   Event(std::uint64_t _trigger_time, std::function<bool(Scheduler&)>&& callback) : trigger_time(_trigger_time), exec(callback) {}
 
   friend bool operator<(const Event& lhs, const Event& rhs)
@@ -31,23 +31,24 @@ struct Event
 };
 
 /*
-  Класс очереди событий.
-  События сортируются по времени наступления.
+  Model events queue wrapper.
 */
 class EventQueue
 {
+  // Model events queue. Sorted by trigger time.
   std::priority_queue<Event> event_queue;
 public:
+
+  // Constructor
   EventQueue() {}
 
-  // Добавить событие
+  // Add event
   void add_event(const Event& ev)
   {
     event_queue.push(ev);
   }
 
-  // Возвращает все события, время наступления которых равно time
-  // Если таких событий нет, то возвращает пустой массив
+  // Return all events which triiger time equal to time. If there are no such events return empty vector.
   std::vector<Event> get_events(const std::uint64_t time)
   {
     std::vector<Event> ret;

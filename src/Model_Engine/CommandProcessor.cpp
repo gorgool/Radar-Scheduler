@@ -1,5 +1,6 @@
 #include "CommandProcessor.h"
 
+// Constuctor. log_filename - command history file name.
 CommandProcessor::CommandProcessor(const std::string & log_filename) : log(log_filename)
 {
   if (log.good() == false)
@@ -14,8 +15,7 @@ CommandProcessor::CommandProcessor(const std::string & log_filename) : log(log_f
   command_tbl[CommandType::ct_tr_rephase_command] = "Transmitter rephase command";
 }
 
-// Добавление массива команд. Команды типа nop игнорируются.
-
+// Add all commands from command_list, except "nop"" type.
 void CommandProcessor::append(const std::vector<ControlCommand>& command_list)
 {
   for (const auto& command : command_list)
@@ -25,13 +25,14 @@ void CommandProcessor::append(const std::vector<ControlCommand>& command_list)
   }
 }
 
+// Clear command queue.
 void CommandProcessor::clear()
 {
   command_queue = std::priority_queue<ControlCommand>();
 }
 
-// Выполнение команд на момент времени в диапазоне от time до (time + 1000000) нс
-
+// "Execute" commands in time range from time to time + 1 microsecond.
+  // Executed commands are deleted from command queue.
 void CommandProcessor::run(const std::uint64_t time)
 {
   execed_commands.clear();
@@ -48,7 +49,7 @@ void CommandProcessor::run(const std::uint64_t time)
     if (ev.execution_time < time +  1e6)
     {
       execed_commands.push_back(ev);
-      // Выполнение команды
+      // "Execution" and logging.
       log << ev.execution_time << " [" << ev.query_id << "] : ";
       switch (ev.type)
       {
@@ -74,7 +75,7 @@ void CommandProcessor::run(const std::uint64_t time)
         log << "ERROR: unknown command in command processor run.\n";
         break;
       }
-      // Удаление команды
+      
       command_queue.pop();
     }
     else
@@ -84,12 +85,10 @@ void CommandProcessor::run(const std::uint64_t time)
   }
 }
 
-// Провверка времени выполнения комманд насоответствование требованиям протокола обмена
+// Validate command_queue for complience with test project. For debug.
 
 bool CommandProcessor::validate()
 {
-  // Примечание: В текущей версии алгоритма формирования комманд управления команда перефазировки АУ
-  // должна быть перед каждой командой УЦП
 
   std::vector<ControlCommand> commands(execed_commands.begin(), execed_commands.end());
   std::vector<ControlCommand> current_commands;
@@ -103,8 +102,8 @@ bool CommandProcessor::validate()
     }
   }
   
-  // Проверка размещения комманд перефазировки АУ передатчика и приемника
-  // Требование: команды должны следовать с периодом не менее 500 мкс
+  // Check rephase command period.
+  // Requirement: rephase command must be => 500 us.
 
   {
     ControlCommand prev_tr_rephase;
@@ -117,7 +116,6 @@ bool CommandProcessor::validate()
           prev_tr_rephase = c;
         else
         {
-          // Проверка условия
           if (c.execution_time - prev_tr_rephase.execution_time < settings::au_command_delay)
           {
             throw ModelException("VALIDATE ERROR: Transmit rephase command is not valid.");
@@ -134,7 +132,6 @@ bool CommandProcessor::validate()
           prev_rs_rephase = c;
         else
         {
-          // Проверка условия
           if (c.execution_time - prev_rs_rephase.execution_time < settings::au_command_delay)
           {
             throw ModelException("VALIDATE ERROR: Receive rephase command is not valid.");
@@ -148,8 +145,8 @@ bool CommandProcessor::validate()
     }
   }
 
-  // Проверка размещения комманд отключения защиты АУ приемника до начала приема
-  // Требование: команда отключения защиты должна быть подана не менее чем за 3 мкс до начала приема
+  // Check receiving protection command execution.
+  // Requirement: Protection command must be executed no later than 3 us before any receive command.
 
   {
     for (const auto& c : current_commands)
@@ -172,8 +169,8 @@ bool CommandProcessor::validate()
     }
   }
 
-  // Проверка размещения комманд перефазирования АУ приемника до начала приема и перефазирования АУ излучателя до начала излучения
-  // Требование: команда перефазирования АУ приемника (излучателя) должна быть подана не менее чем за 270 мкс до начала приема (излучения)
+  // Check setting up antenna direction before any transmition or receiving   
+  // Requirement: Rephase command must be executed no later than 270 us before any receive or transmit command.
 
   {
     for (const auto& c : current_commands)
@@ -212,8 +209,8 @@ bool CommandProcessor::validate()
     }
   }
 
-  // Проверка размещения комманд излучения
-  // Требование: команда на излучение может быть подана только после истечения времени восстановления после излучения (скважность)
+  // Transmit command check
+  // Requirement: Transmit command must be executed no earlier than complition of previous transmit command 
 
   {
     ControlCommand prev_transmit;
@@ -225,7 +222,6 @@ bool CommandProcessor::validate()
           prev_transmit = c;
         else
         {
-          // Проверка условия
           if (prev_transmit.execution_time + prev_transmit.execution_length >  c.execution_time)
           {
             throw ModelException("VALIDATE ERROR: Transmit command was executed in energy restore state.");
@@ -239,9 +235,8 @@ bool CommandProcessor::validate()
     }
   }
 
-  // Проверка что время пересылки
-  // Требование: время пересылки каждого сообщения должно быть раньше чем время выполнения, не менее чем "Предполагаемое время пересылки".
-
+  // Common 
+  // Requirement: Execution time and execution length must not overlap for any adjacent command. 
   {
     for (const auto& c : current_commands)
     {
@@ -271,6 +266,7 @@ bool CommandProcessor::validate()
   return true;
 }
 
+// Save in model_state states of command_queue and execed_commands.
 void CommandProcessor::get_statistics(ModelState & model_state)
 {
   auto planned_commands_copy = command_queue;
@@ -284,6 +280,7 @@ void CommandProcessor::get_statistics(ModelState & model_state)
   std::copy(execed_commands.begin(), execed_commands.end(), model_state.execed_commands.begin());
 }
 
+// Save in model_state command history.
 void CommandProcessor::save_execed_commands(ModelState & model_state)
 {
   for (const auto& c : execed_commands)

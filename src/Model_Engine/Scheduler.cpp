@@ -1,13 +1,11 @@
 #include "Scheduler.h"
 
-
-// Найти индекс на КВД, подходящий для размещения участка transmit_len (нс) и соответствующего ему receive_len (нс) 
-// со смещением range_offset(нс), на глубину планирования depth.
-// Возвращает -1 в случае если такого индекса не существует и положительное целое, равное индексу, в случае успеха.
-
+// Return index for DCU Timeline which allow to allocate region equal to transmit_len (ns) 
+// and coupled to it another region equal to receive_len (ns) with offset range_offset (ns).
+// Returns -1 if there is not such index or positive integer in case of success.
 std::int32_t Scheduler::find_index(const std::uint32_t transmit_len, const std::uint32_t receive_len, const std::uint32_t range_offset, const std::uint32_t depth)
 {
-  // Длина участка излучения, в дискретах
+  // Tramsmit length in timeline chunks
   std::uint32_t tr_length = static_cast<std::uint32_t>(std::ceil(static_cast<double>(transmit_len) / settings::time_chunk_length));
 
   if (tr_length >= depth)
@@ -15,10 +13,10 @@ std::int32_t Scheduler::find_index(const std::uint32_t transmit_len, const std::
     throw ModelException("ERROR: Transmit command length is larger than planning depth in find_index.");
   }
 
-  // Длина участка приема, в дискретах
+  // Receive length in timeline chunks
   std::uint32_t rs_length = static_cast<std::uint32_t>(std::ceil(static_cast<double>(receive_len) / settings::time_chunk_length));;
 
-  // Длина участка перефазировки в дискретах
+  // Rephase length in timeline chunks
   std::uint32_t rph_length = static_cast<std::uint32_t>(std::ceil(static_cast<double>(settings::phase_delay) / settings::time_chunk_length));;
 
   std::uint32_t dcu_sum = 0;
@@ -26,36 +24,36 @@ std::int32_t Scheduler::find_index(const std::uint32_t transmit_len, const std::
   
   std::vector<std::uint16_t> au_indices(depth);
 
-  // Расчет префиксной суммы с индексами размещения
+  // Compute prefix sum such that if pred(idx) == true than sum += 1 otherwise sum = 0
   for (std::uint32_t idx = 0; idx < depth; ++idx)
   {
-    // Префиксная сумма УЦП
+    // DCU prefix sum
     if (dcu_timeline.get_value_at(idx) == TimelineLabel::tll_empty)
       dcu_sum++;
     else
       dcu_sum = 0;
-    // Префиксная сумма АУ
+    // AU prefix sum
     if (tr_au_timeline.get_value_at(idx) == TimelineLabel::tll_empty)
       au_sum++;
     else
       au_sum = 0;
 
-    // Определяем порог УЦП
+    // DCU Allocate region threshold (1 - allocation possible)
     auto dcu_value = dcu_sum > tr_length ? 1 : 0;
 
-    // Определяем порог АУ
+    // AU Allocate region threshold (1 - allocation possible)
     auto au_value = au_sum > rph_length ? 1 : 0;
+
     au_indices[idx] = au_value;
 
     if (dcu_value == 1)
     {
       auto tr_idx = idx - tr_length;
-
-      // Наложение
+      // Convolution of DCU and AU allocate regions
       if (dcu_value * au_indices[tr_idx] == 1)
       {
-        // Получилось разместить и излучение и перефазировку
-        // Проверяем возможность размещения приема и перефазировки
+        // Was abled to allocate coupled transmit and rephase (for the transmit) regions.
+        // Check if we can allocate receive and rephase (for the receive) regions.
         std::uint32_t rs_start_time = tr_idx * settings::time_chunk_length + range_offset;
         std::uint32_t rs_start_idx = dcu_timeline.get_idx_for(rs_start_time);
         std::uint32_t rph_start_time = rs_start_time - settings::phase_delay;
@@ -67,7 +65,7 @@ std::int32_t Scheduler::find_index(const std::uint32_t transmit_len, const std::
           rs_au_timeline.check_index(rph_length, rph_start_idx,
             [](const auto& val) -> bool { return val == TimelineLabel::tll_empty; }) == true)
         {
-          // Разместили удачно. Возвращаем полученный индекс.
+          // If allocation has been succeeded return index.
           return idx - tr_length;
         }
       }
@@ -77,60 +75,53 @@ std::int32_t Scheduler::find_index(const std::uint32_t transmit_len, const std::
   return -1;
 }
 
-// Разместить временную связку scan_pair на КВД в интересах обслуживания заявки query_id.
-// В случае успеха возвращает список команд управления УЦП и АУ. В случае неудачи возвращает комманды типа nop (no operation).
-
-
+// Allocate scan_pair in DCU and AU (both) Timelines for execution query_id.
+// If succeeded return commands list, otherwise empty list of "nop"" commands.
 std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, const std::uint32_t query_id)
 {
-  // Глубина планирования
+  // Timeline planning depth
   std::uint32_t depth;
-  // Длина выполнения команды излучения, в нс (бланками)
+  // Transmit command execution length, ns
   std::uint32_t transmit_len;
-  // Длина выполнения команды приема, в нс (вместе с оцифровкой и бланками)
+  // Receive command execution length, ns
   std::uint32_t receive_len;
-  // Смещение команды приема относительно команды излучения, со сдвигом на величину перефазировки, в нс
+  // Time offset between transmit and receive commands due to target range, ns
   std::uint32_t range_offset_len = multiples_of(static_cast<std::uint32_t>(scan_pair.receive_time)
     - settings::phase_delay - settings::reserve_time, settings::frequency_factor);
 
-  // Период импульсов в пачке (для одиночного импульса равен 0), в нс
+  // Pulse train period
   std::uint32_t period_time = 0;
 
-  // Одиночный импульс
+  // Single pulse
   if (scan_pair.size == 1)
   {
     transmit_len = multiples_of(static_cast<std::uint32_t>(scan_pair.transmit[0].length) * settings::duty_factor
       + 2 * settings::frequency_delay
       + settings::blank_delay
       + settings::reserve_time, settings::frequency_factor);
-
     receive_len = multiples_of(static_cast<std::uint32_t>(scan_pair.receive[0].length + settings::reserve_time), settings::frequency_factor);
-
     depth = settings::planning_depth * settings::planning_step + transmit_len / settings::time_chunk_length;
   }
-  // Пачка
+  // Pulse train
   else
   {
     period_time = static_cast<std::uint32_t>(scan_pair.transmit[1].offset_time);
-    
     transmit_len = multiples_of(period_time * scan_pair.size + settings::blank_delay 
       + 2 * settings::frequency_delay + settings::reserve_time, settings::frequency_factor);
-    
     receive_len = multiples_of(period_time * scan_pair.size + settings::reserve_time, settings::frequency_factor);
-
     depth = settings::planning_depth * settings::planning_step + transmit_len / settings::time_chunk_length;
   }
 
-  // Поиск подходящего места для временной связки на КВД
+  // Find index for allocating the scan pair
   auto idx = find_index(transmit_len, receive_len, range_offset_len, depth);
   if (idx != -1)
   {
-    // Место нашли
-    
-    // Разметка перефазирования передатчика
-    // Относительное время начала перестройки фазы передатчика, нс
+    // If found
+
+    // Labeling transmitter AU Timeline
+    // Transmitter rephase start time offset (from the begining of timeline, here and hereinafter), ns
     std::uint32_t tr_rephase_start_rel = idx * settings::time_chunk_length - settings::phase_delay;
-    // Относительное время конца перестройки фазы передатчика, нс
+    // Transmitter rephase stop time offset, ns
     std::uint32_t tr_rephase_stop_rel = tr_rephase_start_rel + settings::phase_delay;
 
     tr_au_timeline.label_sector(
@@ -138,9 +129,9 @@ std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, co
       tr_au_timeline.get_idx_for(tr_rephase_stop_rel),
       TimelineLabel::tll_au_rephase);
 
-    // Относительное время начала запрета выполнения команд передатчика, нс
+    // Transmitter AU command execution ban start time offset, ns
     std::uint32_t tr_nocommand_start_rel = tr_rephase_stop_rel;
-    // Относительное время конца перестройки фазы передатчика, нс
+    // Transmitter AU command execution ban stop time offset, ns
     std::uint32_t tr_nocommand_stop_rel = tr_nocommand_start_rel + (settings::au_command_delay - settings::phase_delay);
 
     tr_au_timeline.label_sector(
@@ -148,7 +139,7 @@ std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, co
       tr_au_timeline.get_idx_for(tr_nocommand_stop_rel),
       TimelineLabel::tll_au_command_delay);
 
-    // Разметка излучения
+    // Labeling DCU Timeline (transmit)
     dcu_timeline.label_sector(
       dcu_timeline.get_idx_for(tr_rephase_stop_rel),
       dcu_timeline.get_idx_for(tr_rephase_stop_rel + settings::blank_delay + settings::frequency_delay + settings::reserve_time),
@@ -156,19 +147,19 @@ std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, co
 
     for (std::size_t pulse_idx = 0; pulse_idx < scan_pair.size; ++pulse_idx)
     {
-      // Относительное время начала излучения i-го импульса, нс
+      // i-th pulse transmit start time offset, ns
       std::uint32_t transmit_start_rel = tr_rephase_stop_rel + settings::blank_delay + settings::reserve_time + settings::frequency_delay + pulse_idx * period_time;
-      // Относительное время конца излучения i-го импульса, нс
-      std::uint32_t transmit_stop_rel = transmit_start_rel + scan_pair.transmit[pulse_idx].length + settings::blank_delay;// +2 * settings::frequency_delay;
+      // i-th pulse transmit stop time offset, ns
+      std::uint32_t transmit_stop_rel = transmit_start_rel + scan_pair.transmit[pulse_idx].length + settings::blank_delay;
 
       dcu_timeline.label_sector(
         dcu_timeline.get_idx_for(transmit_start_rel),
         dcu_timeline.get_idx_for(transmit_stop_rel),
         TimelineLabel::tll_dcu_transmit);
 
-      // Относительное время начала восстановления после i-го импульса, нс
+      // i-th pulse transmit execution ban start time offset, ns
       std::uint32_t restore_start_rel = transmit_stop_rel;
-      // Относительное время концы восстановления после i-го импульса, нс
+      // i-th pulse transmit execution ban stop time offset, ns
       std::uint32_t restore_stop_rel = restore_start_rel + (settings::duty_factor - 1) * scan_pair.transmit[pulse_idx].length;
 
       dcu_timeline.label_sector(
@@ -177,10 +168,10 @@ std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, co
         TimelineLabel::tll_dcu_energy_restore);
     }
 
-    // Разметка перефазирования приемника
-    // Относительное время начала перестройки фазы передатчика, нс
+    // Labeling receiver AU Timeline
+    // Receiver rephase start time offset, ns
     std::uint32_t rs_rephase_start_rel = tr_rephase_stop_rel + range_offset_len;
-    // Относительное время конца перестройки фазы передатчика, нс
+    // Receiver rephase stop time offset, ns
     std::uint32_t rs_rephase_stop_rel = rs_rephase_start_rel + settings::phase_delay;
 
     rs_au_timeline.label_sector(
@@ -188,9 +179,9 @@ std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, co
       rs_au_timeline.get_idx_for(rs_rephase_stop_rel),
       TimelineLabel::tll_au_rephase);
 
-    // Относительное время начала запрета выполнения команд приемника, нс
+    // Receiver AU command execution ban start time offset, ns
     std::uint32_t rs_nocommand_start_rel = rs_rephase_stop_rel;
-    // Относительное время конца перестройки фазы приемника, нс
+    // Receiver AU command execution ban stop time offset, ns
     std::uint32_t rs_nocommand_stop_rel = rs_nocommand_start_rel + (settings::au_command_delay - settings::phase_delay);
 
     rs_au_timeline.label_sector(
@@ -198,13 +189,13 @@ std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, co
       rs_au_timeline.get_idx_for(rs_nocommand_stop_rel),
       TimelineLabel::tll_au_command_delay);
 
-    // Разметка приема
+    // Labeling DCU Timeline (Receive)
     dcu_timeline.label_sector(
       dcu_timeline.get_idx_for(rs_rephase_stop_rel),
       dcu_timeline.get_idx_for(rs_rephase_stop_rel + settings::reserve_time),
       TimelineLabel::tll_dcu_receive);
 
-    // Дополнительная разметка участков между приемами для сигнала типа пачки
+    // Labeling pulse train receive (pulses and period between pulses)
     if (scan_pair.size > 1)
     {
       dcu_timeline.label_sector(
@@ -213,11 +204,12 @@ std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, co
         TimelineLabel::tll_dcu_receive_prevent);
     }
 
+    // Labeling pulses
     for (std::size_t pulse_idx = 0; pulse_idx < scan_pair.size; ++pulse_idx)
     {
-      // Относительное время начала приема i-го импульса, нс
+      // i-th pulse receive start time offset, ns
       std::uint32_t receive_start_rel = rs_rephase_stop_rel + settings::reserve_time + pulse_idx * period_time;
-      // Относительное время конца приема i-го импульса, нс
+      // i-th pulse receive stop time offset, ns
       std::uint32_t receive_stop_rel = receive_start_rel + scan_pair.receive[pulse_idx].length;
 
       dcu_timeline.label_sector(
@@ -226,19 +218,20 @@ std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, co
         TimelineLabel::tll_dcu_receive);
     }
 
-    // Формируем время исполнения команд управления
-    // Время исполнения команды на перестройку фазы передатчика, нс
-    std::uint64_t transmit_rephase_time = static_cast<std::uint64_t>(dcu_timeline.start_time + idx * settings::time_chunk_length - settings::phase_delay);
+    // Generate control commands
 
-    // Время исполнения команды на излучение, нс
+    // Transmitter rephase command start time (absolute time), ns
+    std::uint64_t transmit_rephase_time = static_cast<std::uint64_t>(dcu_timeline.start_time + idx * settings::time_chunk_length - settings::phase_delay);
+    // Transmit command start time (absolute time), ns
     std::uint64_t transmit_exec_time = static_cast<std::uint64_t>(transmit_rephase_time + settings::phase_delay);
-    // Время исполнения команды на перестройку фазы приемника, нс
+    // Receiver rephase command start time (absolute time), ns
     std::uint64_t receive_rephase_time = static_cast<std::uint64_t>(transmit_exec_time + range_offset_len + settings::reserve_time);
-    // Время исполнения команды на прием, нс
+    // Receive command start time (absolute time), ns
     std::uint64_t receive_exec_time = static_cast<std::uint64_t>(receive_rephase_time + settings::phase_delay);
-    // Время исполнения команды на включение/отключение защиты антенны, нс
+    // Receiver protection turn off command start time (absolute), ns
     std::uint64_t antenna_ptotection_time = static_cast<std::uint64_t>(receive_exec_time - settings::channel_switch_delay);
 
+    // Check range. For debug.
     auto range_offset = receive_exec_time - transmit_exec_time;
     if (range_offset != multiples_of(static_cast<std::uint64_t>(scan_pair.receive_time)))
     {
@@ -255,45 +248,41 @@ std::vector<ControlCommand> Scheduler::place_scan(const ScanPair & scan_pair, co
   }
   else
   {
-    // Не нашли
     return{ ControlCommand() };
   }
 }
 
-// Удаление заявки с идентификатором query_id
+// Remove query whose id equal to query_id.
 void Scheduler::remove_query(const std::uint32_t query_id)
 {
   queries.erase(std::remove_if(queries.begin(), queries.end(), [query_id](const auto& val) { return val->id == query_id; }), queries.end());
 }
 
-// Выполнение одного такта планирования на момент времени time
+// Execute one planning step for time moment equal time
 std::vector<ControlCommand> Scheduler::run(std::uint64_t time)
 {
-  // Смещаем КВД до текущего времени
+  // Move timelines to adjust to current time.
   dcu_timeline.move_timeline(time);
   tr_au_timeline.move_timeline(time);
   rs_au_timeline.move_timeline(time);
 
-  // Перебор списка заявок для создания соответствующих комманд управления
-
-  // Список комманд управления
   std::vector<ControlCommand> ret;
 
-  // Список идентификаторов удаляемых заявок
+  // List of queries to be deleted.
   std::vector<std::uint32_t> removed_id;
 
-  // Массив добавляемых заявок
-  // Заявки активизируются после дообнаружения (захват) и после захвата (сопровождение). Имитация работы ИОТ
+  // List of queries to be added.
+  // Query can be added after confirmation or capture query (aims processing imitation).
   std::vector<std::shared_ptr<Query>> new_queries;
 
-  // Если заявки одна
+  // List that contain one element cant be sorted, so special case for one element list
   if (queries.size() == 1)
   {
     queries.front()->p_value = queries.front()->k * (time - queries.front()->t_prev) * 1.0e-9;
   }
   else
   {
-    // Если много то сортируем заявки по динамическому приоритету, в порядке уменьшения
+    // Compute and sort queries by thier priority in descending order
     std::sort(queries.begin(), queries.end(), [&](auto& lhs, auto& rhs)
     {
       rhs->p_value = rhs->k * (time - rhs->t_prev) * 1.0e-9;
@@ -312,37 +301,38 @@ std::vector<ControlCommand> Scheduler::run(std::uint64_t time)
       {
       case QueryType::search:
       {
-        // Поисковая заявка
+        // Search query
         auto scan_pair = build_scan_pair(q->range, q->rcs, QueryType::search);
 
-        // Попытка разместить на КВД (и УЦП и АУ)
+        // Try to allocate scan pair
         auto commands = place_scan(scan_pair, q->id);
 
-        // Обновляем время последнего исполнения (если комманды не пустые)
+        // If commands list not empty (have elements with no "nop" commands)
         for (const auto& command : commands)
         {
           if (command.type != CommandType::ct_nop)
           {
+            // Allocation of scan pair for the query is succeeded. Save current time as last execution time for the query. 
             q->t_prev = time;
             processed_queries.push_back(q);
             break;
           }
         }
 
-        // Добавляем полученные команды в список команд
+        // Add commands
         ret.insert(ret.end(), commands.begin(), commands.end());
 
         break;
       }
       case QueryType::confirm:
       {
-        // Дообнаружение
+        // Confirmation
         auto scan_pair = build_scan_pair(q->range, q->rcs, QueryType::confirm);
 
-        // Попытка разместить на КВД (и УЦП и АУ)
+        // Try to allocate scan pair
         auto commands = place_scan(scan_pair, q->id);
 
-        // Обновляем время последнего исполнения (если комманды не пустые)
+        // If commands list not empty (have elements with no "nop" commands)
         for (const auto& command : commands)
         {
           if (command.type != CommandType::ct_nop)
@@ -350,29 +340,29 @@ std::vector<ControlCommand> Scheduler::run(std::uint64_t time)
             q->t_prev = time;
             processed_queries.push_back(q);
 
-            // Разовая заявка, удаляем.
+            // Single execution time query, delete it
             removed_id.push_back(q->id);
 
-            // Добавляем новую заявку на захват
+            // Add capture query
             new_queries.push_back(std::make_shared<Query>(QueryType::capture, q->id + 1, settings::capture_query_speed, settings::capture_query_threshold, time, q->range, q->rcs, true));
             break;
           }
         }
 
-        // Добавляем полученные команды в список команд
+        // Add commands
         ret.insert(ret.end(), commands.begin(), commands.end());
 
         break;
       }
       case QueryType::capture:
       {
-        // Захват
+        // Capture
         auto scan_pair = build_scan_pair(q->range, q->rcs, QueryType::capture);
 
-        // Попытка разместить на КВД (и УЦП и АУ)
+        // Try to allocate scan pair
         auto commands = place_scan(scan_pair, q->id);
 
-        // Обновляем время последнего исполнения (если комманды не пустые)
+        // If commands list not empty (have elements with no "nop" commands)
         for (const auto& command : commands)
         {
           if (command.type != CommandType::ct_nop)
@@ -380,62 +370,63 @@ std::vector<ControlCommand> Scheduler::run(std::uint64_t time)
             q->t_prev = time;
             processed_queries.push_back(q);
 
-            // Разовая заявка, удаляем.
+            // Single execution time query, delete it
             removed_id.push_back(q->id);
 
-            // Добавляем новую заявку на сопровождение
+            // Add tracking query
             new_queries.push_back(std::make_shared<Query>(QueryType::tracking, q->id + 1, settings::tracking_query_speed, settings::tracking_query_threshold, time, q->range, q->rcs, true));
             break;
           }
         }
 
-        // Добавляем полученные команды в список команд
+        // Add commands
         ret.insert(ret.end(), commands.begin(), commands.end());
         
         break;
       }
       case QueryType::tracking:
       {
-        // Сопровождение
+        // Tracking
         auto scan_pair = build_scan_pair(q->range, q->rcs, QueryType::tracking);
 
-        // Попытка разместить на КВД (и УЦП и АУ)
+        // Try to allocate scan pair
         auto commands = place_scan(scan_pair, q->id);
 
-        // Обновляем время последнего исполнения (если комманды не пустые)
+        // If commands list not empty (have elements with no "nop" commands)
         for (const auto& command : commands)
         {
           if (command.type != CommandType::ct_nop)
           {
+            // Allocation of scan pair for the query is succeeded. Save current time as last execution time for the query. 
             q->t_prev = time;
             processed_queries.push_back(q);
             break;
           }
         }
 
-        // Добавляем полученные команды в список команд
+        // Add commands
         ret.insert(ret.end(), commands.begin(), commands.end());
 
         break;
       }
       case QueryType::drop:
       {
-        // Сброс заявки
+        // Drop query
         removed_id.push_back(q->id);
         processed_queries.push_back(q);
         break;
       }
       case QueryType::tech_control:
       {
-        // Технический контроль
+        // Devise state request
         auto command = ControlCommand(CommandType::ct_tech_command, time - settings::reserve_time, static_cast<std::uint64_t>(time), 0, q->id);
 
-        // Обновляем время последнего исполнения
+        // Update last execution time
         q->t_prev = time;
 
         processed_queries.push_back(q);
 
-        // Добавляем команду в список команд
+        // Add command
         ret.push_back(command);
 
         break;
@@ -446,17 +437,18 @@ std::vector<ControlCommand> Scheduler::run(std::uint64_t time)
     }
   }
 
-  // Удаляем сброшенные заявки
+  // Delete queries
   for (const auto& id : removed_id)
     remove_query(id);
 
-  // Добавляем новые заявки
+  // Add new queries
   for (const auto& q : new_queries)
     queries.push_back(q);
 
   return ret;
 }
 
+// Fill model_state with active and executed queries parameters.
 void Scheduler::get_statistics(ModelState & model_state)
 {
   for (const auto& q : queries)
@@ -470,6 +462,7 @@ void Scheduler::get_statistics(ModelState & model_state)
   }
 }
 
+// Save timelines state.
 void Scheduler::save_timilines(Timeline &_dcu_timeline, Timeline &_au_tr_timeline, Timeline &_au_rs_timeline)
 {
     _dcu_timeline = dcu_timeline;
@@ -477,6 +470,7 @@ void Scheduler::save_timilines(Timeline &_dcu_timeline, Timeline &_au_tr_timelin
     _au_rs_timeline = rs_au_timeline;
 }
 
+// Clear all queries lists and reset timelines.
 void Scheduler::reset()
 {
     queries.clear();

@@ -2,74 +2,74 @@
 #include <cinttypes>
 
 /*
-  Исходные параметры и константы
+  Settings
 */
 
 namespace settings
 {
-  // Задержка изменения фаз антенны (изменение направление зонда), нс
+  // Time delay of rephase command (change beam direction), ns
   static const std::uint32_t phase_delay = 270000;
 
-  // Задержка выполнения команд на АУ, нс
+  // AU Command execution period, ns
   static const std::uint32_t au_command_delay = 500000;
 
-  // Бланк импульсов (допуски в начале и конце импульсов), нс
+  // Reserve time before and after pulses, ns
   static const std::uint32_t blank_delay = 3100;
 
-  // Время переключения служебных частот, нс
+  // Frequency switch time, ns
   static const std::uint32_t frequency_delay = 3100;
 
-  // Время переключения каналов, в дискретах, нс
+  // Time delay of channel_switch command (change transmit and recieve channels), ns
   static const std::uint32_t channel_switch_delay = 3000;
 
-  // Коэффициент скважности
+  // Pulses duty cycle
   static const std::uint32_t duty_factor = 8;
 
-  // Коэффициент кратности времени привязки, нс
+  // Referance time frequency factor, ns
   static const std::uint32_t frequency_factor = 100;
 
-  // Время задержки передачи. Время задает запас по временир на выполнение сопряженных команд (перефазировка + излучение и т.п)
+  // Control execution estimated time delay.
   static const std::uint32_t reserve_time = 5000;
 
-  // Коэффициент роста поиcковой заявки (с расчетом темпа обзора 50 Гц)
+  // Search query growth rate (search with 50 Hz rate).
   static const double search_query_speed = 50.0;
 
-  // Порог выполнения поиcковой заявки
+  // Search query threshold.
   static const double search_query_threshold = 1.0;
   
-  // Коэффициент роста заявки на сопровождение
+  // Tracking query growth rate.
   static const double tracking_query_speed = 10.0;
 
-  // Коэффициент роста заявки на дообнаружение
+  // Confirmation query growth rate.
   static const double confirm_query_speed = 100.0;
 
-  // Коэффициент роста заявки на захват
+  // Capture query growth rate.
   static const double capture_query_speed = 100.0;
 
-  // Коэффициент роста заявки на запрос технического состояния
+  // Device status request query growth rate.
   static const double tech_control_speed = 1.0;
 
-  // Порог выполнения заявки на сопровождение
+  // Tracking query threshold.
   static const double tracking_query_threshold = 1.0;
 
-  // Порог выполнения заявки на дообнаружение
+  // Confirmation query threshold.
   static const double confirm_query_threshold = 0.0;
 
-  // Порог выполнения заявки на захват
+  // Capture query growth threshold.
   static const double capture_query_threshold = 0.0;
 
-  // Порог выполнения заявки на запрос технического состояния
+  // Device status request query threshold.
   static const double tech_control_threshold = 1.0;
 
-  // Длительность временного дискрета, нс
+  // Timeline chunk (the samllest part), ns
   static const std::uint32_t time_chunk_length = 10000;
 
-  // Интервал планирования, в дискретах (1 мс)
+  // Planning period (1 ms), in timeline chunks
   static const std::uint32_t planning_step = 100;
 
-  // Глубина конвейера, в дискретах (1 сек)
+  // Timeline length (1 second), in timeline chunks
   static const std::uint32_t timeline_depth = 100000;
 
-  // Глубина планирования
+  // Planning depth (10 ms), in timeline chunks
   static const std::uint32_t planning_depth = 10;
 }

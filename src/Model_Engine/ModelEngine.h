@@ -8,48 +8,50 @@
 #include <chrono>
 #include <iostream>
 
+/*
+  Model engine. Control execution of the model.
+*/
+
 class ModelEngine
 {
-  // КВД
+  // Planner.
   Scheduler shed;
 
-  // Командный процессор
+  // Commands processor.
   CommandProcessor command_processor;
 
-  // Очередь событий моделирования
+  // Event queue.
   EventQueue ev_queue;
 
-  // Текущее время моделирования, мс
+  // Current modelling time, ns.
   std::uint64_t model_time = 0;
 
-  // Интервал планирования, нс
+  // Modelling step, ns.
   std::uint64_t time_step = 1000000;
-
-  // Флаг выполнения процесса моделирования
-  bool running = false;
 
 public:
 
-  // Конструктор. Заполняет очередь событий моделирования.
+  // Constructor.
   ModelEngine() : command_processor("log.txt") {}
 
-  // Запуск цикла моделирования
+  // Execution of "times" modelling cycles. 
   ModelState run(const std::uint32_t times = 1)
   {
     ModelState ret;
 
     try
     {
+        // For debug.
         shed.save_timilines(ret.dcu_timeline_before, ret.au_tr_timeline_before, ret.au_rs_timeline_before);
 
         for(std::uint32_t counter = 0; counter < times; ++counter)
         {
-            // Получение списка событий на текущее время моделирования
+            // Get event for current time.
             auto events = ev_queue.get_events(model_time);
 
             if (!events.empty())
             {
-              // Исполнение событий
+              // Execute events.
               for (auto& ev : events)
               {
                 auto ret = ev.exec(shed);
@@ -58,31 +60,37 @@ public:
               }
             }
 
-            // Запуск планировщика
+            // Execute planner.
             auto command_list = shed.run(model_time);
 
-            // Добавление всех спланированных на текущем такте комманд
+            // Add all planned command in the queue.
             command_processor.append(command_list);
 
+            // For debug. If it is the last cycle in this run check validate result.
             if (counter == times - 1)
             {
                 ret.time = model_time;
                 ret.valid_state = command_processor.validate();
             }
 
-            // Выполнение кщманд управления для текущего такта
+            // Execute all command for current time.
             command_processor.run(model_time);
+
+            // For debug.
             command_processor.save_execed_commands(ret);
-            // Увеличение текущего времени моделирования
+
+            // Next modelling time.
             model_time += time_step;
         }
 
+        // For debug.
         command_processor.get_statistics(ret);
         shed.get_statistics(ret);
         shed.save_timilines(ret.dcu_timeline_after, ret.au_tr_timeline_after, ret.au_rs_timeline_after);
     }
     catch (const ModelException& ex)
     {
+        // Reset model engine
         model_time = 0;
         shed.reset();
         command_processor.clear();
@@ -93,12 +101,13 @@ public:
     return ret;
   }
 
-  // Дабавить событие моделирования
+  // Add modelling event
   void add_event(const Event& ev)
   {
       ev_queue.add_event(ev);
   }
 
+  // Return size of event queue
   std::size_t events_count() const
   {
       return ev_queue.size();

@@ -3,6 +3,9 @@
 #include <exception>
 #include <string>
 
+/*
+  Exception class for model engine.
+*/
 class ModelException : public std::exception
 {
   std::string msg;

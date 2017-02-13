@@ -10,18 +10,17 @@
 #include "ModelException.h"
 
 /*
-  Временная связка
+  Pair of signals for scanning one target (group of targets).
 */
 
 class ScanPair
 {
 public:
 
+  // Contructor.
   ScanPair(const std::size_t _size = 1) : receive_time(0)
-  {
-    // Примечание: рассматриваются только пачки от 1 до 16 импульсов
-    
-    // Округление количества импульсов до ближайшего числа (степени двойки)
+  { 
+    // Round pulse train size up to the power of 2.
     std::size_t temp = 0;
     while (static_cast<std::size_t>(std::pow(2, temp)) < _size)
     {
@@ -29,14 +28,15 @@ public:
     }
 
     size = static_cast<std::size_t>(std::pow(2, temp));
-    receive = new receive_desc[size];
-    transmit = new transmit_desc[size];
+    receive = new pulse_train_desc[size];
+    transmit = new pulse_train_desc[size];
   }
 
+  // Copy constructor.
   ScanPair(const ScanPair& obj) : size(obj.size), receive_time(obj.receive_time)
   {
-    receive = new receive_desc[size];
-    transmit = new transmit_desc[size];
+    receive = new pulse_train_desc[size];
+    transmit = new pulse_train_desc[size];
 
     for (std::size_t idx = 0; idx < size; ++idx)
     {
@@ -45,23 +45,24 @@ public:
     }    
   }
 
+  // Destructor.
   ~ScanPair()
   {
     delete[] receive;
     delete[] transmit;
   }
 
-  // Задание время начала приема.
-  // range - прогнозируемая дальность до ОК, м.
+  // Cumpute and setup receivng time, depending of range.
+  // range - estimate range to target, m.
   void set_receive_time(const double range)
   {
     assert(transmit[0].length != 0);
 
-    // Задержка времени по дальности
+    // Range time delay
     double range_delay_time = 2.0 * range / 299792458.0;
     std::uint32_t rdt_nanosec = static_cast<std::uint32_t>(std::ceil(range_delay_time * 1e9));
     
-    // Задержка времени излучения для пачек
+    // Pulse train delay time
     if (size > 1)
     {
       std::uint32_t transmit_time_nanosec = 0;
@@ -76,15 +77,22 @@ public:
         return;
       }
     }
+    else
+    {
+      if (transmit[0].length > rdt_nanosec)
+      {
+        throw ModelException("ERROR: Single pulse transmit time is larger than range delay time offset.");
+        return;
+      }
+    }
 
     receive_time = multiples_of(rdt_nanosec);
     return;
   }
 
-  // Формирование приемной диаграммы направленности (ДН).
-  // Значения по умолчанию соответствуют одиночному импульсу.
-  // length - Длительность приема одного импульса в пачке (или единичного импульса), нс
-  // offset_time - Период повторения приемных участков в пачке (0 для одиночного импульса), нс
+  // Setup receive time.
+  // length - length of single pulse receive (or the only pulse, if size equal 1), ns
+  // offset_time - pulse train period (0 for single pulse), ns
   void set_receive(std::uint32_t length, std::uint32_t offset_time = 0)
   {
     for (std::size_t idx = 0; idx < size; ++idx)
@@ -98,10 +106,9 @@ public:
    
   }
 
-  // Формирование пачки передающих ДН.
-  // Значения по умолчанию соответствуют одиночному импульсу.
-  // length - Длительность излучения одного импульса в пачке (или единичного импульса), нс
-  // offset_time - Период повторения излучения в пачке (0 для одиночного импульса), нс
+  // Setup transmit time.
+  // length - length of single pulse transmit (or the only pulse, if size equal 1), ns
+  // offset_time - pulse train period (0 for single pulse), ns
   void set_transmit(std::uint32_t length, std::uint32_t offset_time = 0)
   {
     for (std::size_t idx = 0; idx < size; ++idx)
@@ -114,27 +121,20 @@ public:
     }
   }
 
-  // Количесво импульсов в пачке
+  // Pulse train size
   std::uint32_t size;
 
-  // Масссив описания приемных интервалов
-  struct receive_desc
+  // Pulse train description
+  struct pulse_train_desc
   {
-    // Смещение приема текущего участка, относительно предыдущего, нс
+    // Offset time for current pulse with respect to the previous pulse, ns
     std::uint32_t offset_time = 0;
     // Длительность приема, нс
     std::uint32_t length = 0;
-  } *receive;
-
-  // Массив описания импульсов излучения в пачке
-  struct transmit_desc
-  {
-    // Смещение текущего импульса излучения, относительно предыдущего, нс
-    std::uint32_t offset_time = 0;
-    // Длительность излучения, нс
-    std::uint32_t length = 0;
-  } *transmit;
+  };
+  pulse_train_desc *receive;
+  pulse_train_desc *transmit;
  
-  // Время начала приема, относительно начала излучения, нс
+  // Receive time offset with respect to the transmit time, ns
   std::uint32_t receive_time;
 };

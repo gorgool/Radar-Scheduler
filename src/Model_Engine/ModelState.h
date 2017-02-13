@@ -8,50 +8,50 @@
 #include "Timeline.h"
 
 /*
-  Структура описывающая состояние элементов модели Планировщика
+  State of the Planner Model
 */
 
 struct ModelState
 {
-  // Модельное время (Время привязки состояния модели)
+  // Model referance time
   std::uint64_t time;
 
-  // Признак прохождения валидации на момент времени привязки
+  // Validation flag at referance time
   bool valid_state = false;
 
-  // Список активных заявок на момент времени привязки
+  // All active queries at referance time
   std::vector<Query> active_queries;
 
-  // Список исполненных заявок на момент времени привязки
+  // List of all executed queries at referance time
   std::vector<Query> processed_queries;
 
-  // Список запланированных команд на момент времени привязки
+  // List of all planned commands at referance time
   std::vector<ControlCommand> planned_commands;
 
-  // Список исполненных команд на момент времени привязки
+  // List of all executed commands at referance time
   std::vector<ControlCommand> execed_commands;
 
-  // Состояние КВД УЦП до попытки размещения команд на момент времени привязки
+  // DCU Timeline state before scheduler activation at referance time
   Timeline dcu_timeline_before;
 
-  // Состояние КВД УЦП после попытки размещения команд на момент времени привязки
+  // DCU Timeline state after scheduler activation at referance time
   Timeline dcu_timeline_after;
 
-  // Состояние КВД АУ передатчика до попытки размещения команд на момент времени привязки
+  // AU Transmitter Timeline state before scheduler activation at referance time
   Timeline au_tr_timeline_before;
 
-  // Состояние КВД АУ передатчика после попытки размещения команд на момент времени привязки
+  // AU Transmitter Timeline state after scheduler activation at referance time
   Timeline au_tr_timeline_after;
 
-  // Состояние КВД АУ приемника до попытки размещения команд на момент времени привязки
+  // AU Receiver Timeline state before scheduler activation at referance time
   Timeline au_rs_timeline_before;
 
-  // Состояние КВД АУ передатчика после попытки размещения команд на момент времени привязки
+  // AU Receiver Timeline state after scheduler activation at referance time
   Timeline au_rs_timeline_after;
 
-  // История выполненых команд
+  // Command history
   std::vector<std::string> command_history;
 
-  // Строка ошибок. Если строка пустая то ошибки отсутствуют
+  // Error string. If there are not errors the string is empty.
   std::string error_string;
 }; 

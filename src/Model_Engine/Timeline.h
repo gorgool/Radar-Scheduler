@@ -8,21 +8,21 @@
 #include "Utility.h"
 #include "ModelException.h"
 
-// Метки дискретов КВД
+// Timeline labels
 enum TimelineLabel : std::uint8_t
 {
-  tll_empty,                // Свободно
-  tll_dcu_receive,          // Прием на УЦП
-  tll_dcu_transmit,         // Излучение на УЦП
-  tll_au_rephase,           // Перефазировка на АУ
-  tll_au_command_delay,     // Задержка исполнения команд на АУ
-  tll_au_channel_switch,    // Переключение приемного/передающего канала на АУ
-  tll_dcu_energy_restore,   // Накопление энергии после излучения на УЦП
-  tll_dcu_receive_prevent   // Запрет промежуточного приема при приеме пачки в УЦП
+  tll_empty,                // Free (Not occupied)
+  tll_dcu_receive,          // DCU receive command
+  tll_dcu_transmit,         // DCU transmit command
+  tll_au_rephase,           // AU rephasing command
+  tll_au_command_delay,     // AU command execution ban
+  tll_au_channel_switch,    // AU recieve/transmit channel switch command
+  tll_dcu_energy_restore,   // DCU transmit duty cycle delay
+  tll_dcu_receive_prevent   // DCU coherent pulse train recive
 };
 
 /*
-  Обобщенный конвейер временных дискретов
+  Timeline
 */
 
 class Timeline
@@ -31,42 +31,42 @@ class Timeline
 
 public:
 
-  // Время привязки первого дискрета КВД (постоянно возрастает), нс
+  // First (idx = 0) timeline chunk referance time, ns
   std::uint64_t start_time;
 
-  // Индекс первого дискрета КВД
+  // Internal index of first timeline chunk
   std::uint32_t start_idx;
 
-  // Массив временных дискретов КВД УЦП
+  // Timeline array
   pipiline_type timeline;
 
-  // Проверка возможности размещения участка длительностью length по индексу idx согласно критерию pred.
-  // Возвращает false в случае неудачи и true в случае успеха
+  // Check if it is posible to allocate region of length starting from idx with given pred (predicate).
+  // Return true in case of success. false otherwise.
   bool check_index(const std::uint32_t length, const std::uint32_t idx, std::function<bool(const pipiline_type::value_type&)> pred);
 
-  // Разметить участок на КВД начиная с инндекса start_idx до stop_idx меткой label
+  // Mark timeline region from start_idx to stop_idx with given label.
   void label_sector(const std::uint32_t start_idx, const std::uint32_t stop_idx, const TimelineLabel label);
 
-  // Индексация массива временых дискретов. Возвращает ссылку на значение дискрета по индексу idx.
-  // Пример: индекс 0 возвращает самый ранний по времени временной дискрет.
+  // Return refarance to timeline chunk by idx. Idx=0 correspond to most recent chunk.
   const TimelineLabel& get_value_at(const std::size_t idx) const;
   TimelineLabel& get_value_at(const std::size_t idx);
 
-  // Возвращает индекс дискрета для времени time (нс) относительно начала КВД, т.е время 0 вернет индекс равный 0.
-  // Возвращает -1 в случае если такого индекса не существует и положительное целое, равное индексу, в случае успеха.
+  // Return index for timeline chunk that corresponds to given relative time, g.e. time=0 return index=0.
+  // Return -1 if there is not such index.
   std::int32_t get_idx_for(const std::uint32_t time);
 
-  // Сместить конвейер вперед до времени time и подготовить новый участок.
-  // Примечание 
+  // Move timetile till given time. Update start_time and start_idx and prepare new region.
   void move_timeline(std::uint64_t time);
 
-  // Расчет коэффициента занятости КВД, как отношение свободных дискретов (tll_empty) ко всем дискретам.
+  // Compute occupation coefficient.
   double occupation();
 
-  // Сброс всех параметров КВД
+  // Reset all.
   void reset();
 
+  // Contructor.
   Timeline() : start_time(0), start_idx(0) { timeline.fill(TimelineLabel::tll_empty); }
 
+  // Destructor.
   ~Timeline() {};
 };

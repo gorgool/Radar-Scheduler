@@ -1,9 +1,9 @@
 #include "BuildScanPair.h"
 
 /*
-  Вспомогательная функция определения кода сигнала.
-  tau - длительность зондирующей посылки, секунды
-  type - тип заявки (вид обслуживания)
+  Signal Code translation helper function.
+  tau - transmit signal length, seconds
+  type - query type
 */
 
 static SignalType get_signal_code(const double tau, const QueryType type)
@@ -55,7 +55,7 @@ static SignalType get_signal_code(const double tau, const QueryType type)
     break;
   }
 
-  // !!! Примечание: вид обслуживания АЧХ, ДП, ДСП, ССС не рассматриваются
+  // !!! NOTE:  Only SOTS sevice types are implemented
 
   default:
   {
@@ -65,7 +65,7 @@ static SignalType get_signal_code(const double tau, const QueryType type)
 }
 
 /*
-  Таблица параметров кодов сигналов
+  Signal's code parameters table
 */
 static std::map<SignalType, SignalParams> signal_tbl
 {
@@ -87,11 +87,10 @@ static std::map<SignalType, SignalParams> signal_tbl
 };
 
 /*
-  Вспомогательная функция формирования временной связки по параметрам сигнала.
-  signal_params - параметры сигнала, SignalParams
-  tua - длительность зондирующей посылки, секунды
-  range - прогнозируемая дальность до ОК, м.
-  type - тип заявки
+  Scanning pair (receive and transmit) creation hepler function.
+  signal_params - signal params
+  tua - transmit time estimation, seconds
+  range - range estimation, m.
 */
 
 static ScanPair create_scan_pair(const SignalParams& signal_params, const double tau, const double range)
@@ -100,78 +99,71 @@ static ScanPair create_scan_pair(const SignalParams& signal_params, const double
 
   std::uint64_t tau_nsec = static_cast<std::uint64_t>(tau * 1e9);
 
-  // Кол-во импульсов в пачке
+  // Number of pulses in pulse train
   std::uint32_t pulse_train_length = static_cast<std::uint32_t>(std::trunc(tau_nsec / 240000 + 1));
 
   if (pulse_train_length > signal_params.pulse_number_high || pulse_train_length < signal_params.pulses_number_low)
   {
-    // Если количество импульсов в пачке слишком велико
     throw ModelException("ERROR. Pulse train length is too high in create_scan_pair.");
   }
 
   ScanPair ret(pulse_train_length);
 
-  // Минимальный период излучения
+  // Minimum stransmit time period
   std::uint32_t T_transmit = signal_params.duration * settings::duty_factor;
   if (T_transmit > signal_params.period_high || T_transmit < signal_params.period_low)
-  {
-    // Период повторения не поддерживается 
+  { 
     throw ModelException("ERROR. Pulse train period is not valid in create_scan_pair.");
   }
 
-  // Передающая ДН
   ret.set_transmit(multiples_of(signal_params.duration), multiples_of(T_transmit));
-  // Приемная ДН
   ret.set_receive(multiples_of(signal_params.duration), multiples_of(T_transmit));
-  // Время смещения приема
   ret.set_receive_time(range);
 
   return ret;
 }
 
 /*
-  Выбор типа зондирующего сигнала на основании дальности и ожидаемой ЭПР ОК.
-  Примечание: в текущей версии сигналы типа пачки генерируются без наложения приемного и передающего участка
-  range - прогнозируемая дальность до ОК, м.
-  rcs - прогнозируемая эффективная поверхность рассеивания, кв. м.
-  type - тип заявки
+  Scan pair creation function depending of range and RCS
+  range - range estimation, m.
+  rcs - radar cross-section, sq. m.
+  type - query type
 */
 
 ScanPair build_scan_pair(const double range, const double rcs, const QueryType type)
 {
-  // ========== Расчетные параметры и коэффициенты =============
+  // ======= Transmit time estimation =======
   const double elevation = 20.0;
   const double elevation_rad = elevation * M_PI / 180.0;
-  // Отношение сигнал/шум
+  // SN ration of detection
   double q = 20.0;
-  // !!! Примечание : реальное отношение для сопровождения вычисляется на основании тренда изменения сигнал/шум
-  // Мощьность ПУ
+  // Transmit Power
   double P = 1.2e5;
 
-  // Эффективная длина трассы водяного пара
+  // Water vapor path length
   double r_h2o = std::sqrt(std::pow(8500.0 * sin(elevation_rad), 2) + 2.0 * 8500.0 * 2.0) - 8500.0 * sin(elevation_rad);
 
-  // Эффективная длина трассы кислорода
+  // Oxygen path length
   double r_o = std::sqrt(std::pow(8500.0 * sin(elevation_rad), 2) + 2.0 * 8500.0 * 4.0) - 8500.0 * sin(elevation_rad);
 
-  // Коэффициент потерь в атмосфере
+  // Atmosphere attenuation
   double n = 1.0 / (std::pow(10.0, 2.0 * (0.07 * r_h2o + 0.045 * r_o) / 10.0));
 
-  // Шумовая температура
+  // Temperature noise
   double T_a = 79.0 - 17.0 * elevation / 10.0;
   double T = T_a *0.507 + 441.5;
 
-  // Промежуточный коэффициент 1
+  // Helper coefficient 1
   double coef1 = (8.83e-3 * 8.83e-3 * n) / (std::pow(4.0 * M_PI, 3) * 1.38e-23 * T);
 
-  // Промежуточный коэффициент 2
-  // !!!Примечание : для упрощения моделирования принято, что направление ГОА и направление зонда всегда совпадают
+  // Helper coefficient 2
+  // !!!NOTE : Assume that pulse direction and normal from antenna center are always the same
   double coef2 = std::pow(10, 5.37) * std::pow(10, 6.785) * 1.0 * 1.0;
 
-  // Расчет времени зондирующего сигнала
+  // Time estimation
   double tau = q * q * std::pow(range, 4) / (coef1 * coef2 * rcs * P);
 
-  // Параметры сигнала
+  // Choose signal
   auto signal_params = signal_tbl[get_signal_code(tau, type)];
 
   return create_scan_pair(signal_params, tau, range);

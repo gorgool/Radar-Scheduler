@@ -13,42 +13,41 @@
 #include "ControlCommand.h"
 
 /*
-  Класс сохраняющий все запланированные команду управления и аредоставляющий возможность.
-  отбирать команды, чье время привязки находится в заданном интервале
+  Class that saves all commands and allows to "execute" them for specific time range.
 */
 class CommandProcessor
 {
-  // Очередь всех запланированных команд управления. Сортируется по времени привязки
+  // All planned control commands queue. Sorted by referance time.
   std::priority_queue<ControlCommand> command_queue;
 
-  // Список исполненных в последнем запуске фукнции run команд
+  // List of all executed (in last run) commands. For debug.
   std::vector<ControlCommand> execed_commands;
 
-  // Файл для вывода истории исполнения команд
+  // Command history log file. For debug.
   std::ofstream log;
 
-  // Таблица трансляции "тип команды" -> "описание"
+  // "Command type" -> "Description" translation table. For debug.
   std::map<CommandType, std::string> command_tbl;
 public:
-  // Конструктор. log_filename - имя файла истории выполнения команд
+  // Constuctor. log_filename - command history file name
   CommandProcessor(const std::string& log_filename);
 
-  // Добавить команды из списка command_list. Если тип добавляемой команды nop, то команда игнорируется
+  // Add all commands from command_list, except "nop"" type.
   void append(const std::vector<ControlCommand>& command_list);
 
-  // Очистить очередь команд
+  // Clear command queue.
   void clear();
 
-  // Отбор команд управления, чье время привзяки находится в интервале от time нс до (time + 1000000) нс.
-  // Отобранные команды удаляются из списка запланированных команд
+  // "Execute" commands in time range from time to time + 1 microsecond (us).
+  // Executed commands are deleted from command queue.
   void run(const std::uint64_t time);
 
-  // Проверка очереди запланированных команд на соответствие требованиям протокола обмена (проект "Моренос РЛК")
+  // Validate command_queue for complience with test project. For debug.
   bool validate();
 
-  // Запись в model_state состояния command_queue и execed_commands
+  // Save in model_state states of command_queue and execed_commands.
   void get_statistics(ModelState& model_state);
 
-  // Запись в model_state всех исполненных команд в текстовом представлении
+  // Save in model_state command history.
   void save_execed_commands(ModelState& model_state);
 };
